@@ -8,7 +8,7 @@ from typing import Any
 
 from ..config_loader import AgentPaths, ModelsConfig
 from ..jsonutil import extract_json_object
-from ..ollama_client import chat
+from ..llm import complete_chat
 from ..repo_context import list_repo_files, tree_summary
 from ..trace import append_trace
 
@@ -39,15 +39,7 @@ def run_memory_update(
         {"role": "system", "content": "You produce JSON describing the repo. Use a ```json fence."},
         {"role": "user", "content": user},
     ]
-    model = models.models["memory"]
-    opt = models.options.get("memory", {})
-    content = chat(
-        models.ollama_base_url,
-        model,
-        messages,
-        temperature=float(opt.get("temperature", 0.2)),
-        num_ctx=int(opt.get("num_ctx", 4096)) if opt.get("num_ctx") else None,
-    )
+    content = complete_chat(root, models, "memory", messages)
     meta = extract_json_object(content)
 
     out = paths.memory_dir / "repo-summary.md"

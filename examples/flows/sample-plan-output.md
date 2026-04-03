@@ -1,16 +1,24 @@
-# Sample planner output (illustrative)
+# Sample planner output
 
-The planner writes two artifacts under `memory/plans/`:
+Running:
 
-- `<task-id>.plan.json` — machine-readable plan for the executor.
-- `<task-id>.plan.md` — human-readable summary.
+```bash
+./scripts/plan.sh --task tasks/example-feature.task.json
+```
 
-## Example `steps` entry
+writes two artifacts under `memory/plans/`:
+
+| File | Contents |
+|------|----------|
+| `example-feature-001.plan.json` | Machine-readable plan for the executor |
+| `example-feature-001.plan.md` | Human-readable phases, steps, and risks |
+
+## Example step object (JSON)
 
 ```json
 {
-  "title": "Add health check helper",
-  "intent": "Implement a minimal HTTP GET to Ollama /api/tags from stdlib.",
+  "title": "Add Ollama health check to doctor output",
+  "intent": "Surface model tags and base URL in JSON for scripting.",
   "mode": "write",
   "risk": "low",
   "validation": "python3 -m compileall -q agent"
@@ -20,6 +28,14 @@ The planner writes two artifacts under `memory/plans/`:
 ## Safe iteration
 
 1. Run planning only: `./scripts/plan.sh --task tasks/example-feature.task.json`
-2. Inspect `memory/plans/*.plan.md`
-3. Execute step 0 dry-run: `./scripts/execute.sh --task ... --plan ... --step 0`
-4. Apply changes: add `--force-execute` when you accept the proposed diff narrative
+2. Open `memory/plans/example-feature-001.plan.md` and confirm scope
+3. Execute step 0 in dry-run (default):
+
+```bash
+./scripts/execute.sh \
+  --task tasks/example-feature.task.json \
+  --plan memory/plans/example-feature-001.plan.json \
+  --step 0
+```
+
+4. Apply changes only after review: add `--force-execute` (and optionally `--validate-after`)

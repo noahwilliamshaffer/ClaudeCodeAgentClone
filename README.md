@@ -1,238 +1,223 @@
 # Local agent workspace (OpenCode + Ollama + Cursor)
 
-A **local-first**, **production-style** scaffold for agentic coding: planning, controlled execution, review, and persistent memory — with **no paid API required**.
+A **local-first** agentic coding workspace: **planning**, **controlled execution**, **review**, and **persistent memory**. The default runtime is **Ollama** over HTTP; **OpenCode** is optional and routed through a small adapter (`agent/llm.py`, `agent/opencode_adapter.py`). **No paid API is required.**
 
 | Layer | Role |
 |-------|------|
-| **Python `agent/` package** | Orchestrator: planner / executor / reviewer / memory (uses **Ollama HTTP API**). |
-| **`opencode.json`** | OpenCode project defaults (models, instructions, permissions). |
-| **`skills/` + `prompts/`** | Reusable behaviors and prompt templates. |
-| **`config/`** | Model names, workspace paths, guardrails (single place to swap models). |
-| **`scripts/`** | Thin bash wrappers optimized for **Cursor’s integrated terminal**. |
+| **`agent/`** | Python orchestrator: CLI, flows, guardrails, JSON parsing, trace logging |
+| **`opencode.json`** | OpenCode project defaults when using the OpenCode CLI interactively |
+| **`prompts/` + `skills/`** | Prompt templates and reusable behaviors |
+| **`config/`** | Models, Ollama URL, workspace paths, guardrails |
+| **`scripts/`** | Bash entrypoints for Cursor’s terminal |
+| **`docs/INTEGRATION-OPENCODE.md`** | OpenCode vs Ollama transport map |
 
 ## Prerequisites
 
-- **Python 3.11+** (`python3` on PATH)
-- **Ollama** — local model runtime ([ollama.com](https://ollama.com))
-- **OpenCode** (optional for interactive TUI / `opencode run`) — [OpenCode docs](https://open-code.ai/docs/en/cli)
-- **Cursor** (recommended IDE) — open this folder as the workspace root
+- **Python 3.11+**
+- **Ollama** — [ollama.com](https://ollama.com)
+- **OpenCode** (optional) — [OpenCode CLI](https://open-code.ai/docs/en/cli)
+- **Cursor** (recommended) — open this folder as the workspace root
 
-## Quick start (Cursor workflow)
-
-1. **Open this repository in Cursor** (`File → Open Folder`).
-2. Open the **integrated terminal** at the repo root.
-3. Run:
+## Quick start
 
 ```bash
-chmod +x scripts/*.sh   # first clone only
+chmod +x scripts/*.sh
 ./scripts/bootstrap.sh
 ```
 
-4. Start **Ollama** (if not already running) and pull models (see below).
-5. **Plan** from a task file:
+Start Ollama, pull models, then:
 
 ```bash
+python3 -m agent doctor
 ./scripts/plan.sh --task tasks/example-feature.task.json
 ```
 
-6. Inspect `memory/plans/*.plan.md` and the matching `.plan.json`.
-7. **Execute** a single step in **safe (dry-run) mode** (default):
+## Sample: analyze this repo and propose a secure refactor plan
+
+This runs the **planner only** (no executor writes). It uses `prompts/planner.secure-refactor.md` and `skills/secure-refactor-planning.md`.
 
 ```bash
-./scripts/execute.sh \
-  --task tasks/example-feature.task.json \
-  --plan memory/plans/example-feature-001.plan.json \
-  --step 0
+./scripts/sample-secure-refactor-plan.sh
 ```
 
-8. When you accept the proposed actions, re-run with **`--force-execute`** to apply writes and run commands:
+Manual equivalent:
 
 ```bash
-./scripts/execute.sh \
-  --task tasks/example-feature.task.json \
-  --plan memory/plans/example-feature-001.plan.json \
-  --step 0 \
-  --force-execute \
-  --validate-after
+python3 -m agent doctor
+python3 -m agent plan --task tasks/secure-refactor-analysis.task.json
 ```
 
-9. **Review**:
+Open outputs:
+
+- `memory/plans/secure-refactor-analysis-001.plan.md`
+- `memory/plans/secure-refactor-analysis-001.plan.json`
+
+More detail: `examples/flows/secure-refactor-sample.md`.
+
+## Installing Ollama
 
 ```bash
-./scripts/review.sh --task tasks/example-feature.task.json --plan memory/plans/example-feature-001.plan.json
+ollama --version
+ollama pull llama3.2:latest
+ollama pull qwen2.5-coder:latest
 ```
 
-10. **Health check** (Ollama reachable):
+Match tags in **`config/models.json`**. Optional: set **`OLLAMA_HOST`** (see `config/models.json` and `.env.example`).
+
+## Ollama immediately (default)
+
+- Orchestrator calls **`http://127.0.0.1:11434`** (or `OLLAMA_HOST`) via `agent/ollama_client.py`.
+- **`OPENCODE_RUNTIME`** unset → all LLM calls use Ollama directly.
 
 ```bash
 python3 -m agent doctor
 ```
 
-### One-shot loop (plan → all steps → review)
+## Optional: OpenCode as LLM transport
 
-Dry-run (default):
+Set:
+
+```bash
+export OPENCODE_RUNTIME=1
+```
+
+Then `agent/llm.py` uses `opencode run` (see `docs/INTEGRATION-OPENCODE.md`). Interactive use:
+
+```bash
+./scripts/opencode-run.sh "Summarize the repository layout."
+```
+
+## Execute / review / loop
+
+Dry-run executor (default):
+
+```bash
+./scripts/execute.sh --task tasks/example-feature.task.json \
+  --plan memory/plans/example-feature-001.plan.json --step 0
+```
+
+Apply writes and commands:
+
+```bash
+./scripts/execute.sh --task tasks/example-feature.task.json \
+  --plan memory/plans/example-feature-001.plan.json --step 0 \
+  --force-execute --validate-after
+```
+
+Review:
+
+```bash
+./scripts/review.sh --task tasks/example-feature.task.json \
+  --plan memory/plans/example-feature-001.plan.json
+```
+
+Full loop:
 
 ```bash
 ./scripts/loop.sh --task tasks/example-feature.task.json
 ```
 
-Apply changes + run task validations:
-
-```bash
-./scripts/loop.sh --task tasks/example-feature.task.json --force-execute --validate-after
-```
-
-## Installing Ollama
-
-Follow the official install for your OS: [https://ollama.com/download](https://ollama.com/download)
-
-Verify:
-
-```bash
-ollama --version
-ollama serve   # if you need the daemon explicitly
-```
-
-## Recommended models (two profiles)
-
-Edit **`config/models.json`** to match tags you actually pulled.
-
-| Role | Suggested Ollama model | Notes |
-|------|------------------------|-------|
-| **Planner** (fast / structured) | `llama3.2:latest` | Lightweight planning / summaries |
-| **Executor** (coding) | `qwen2.5-coder:latest` | Strong general coding assistance |
-
-Pull examples:
-
-```bash
-ollama pull llama3.2:latest
-ollama pull qwen2.5-coder:latest
-```
-
-Keep **`opencode.json`** `model` / `small_model` in sync with how you want OpenCode interactive sessions to behave (format `ollama/<tag>`).
-
-## Installing or verifying OpenCode
-
-See the official CLI docs: [OpenCode CLI](https://open-code.ai/docs/en/cli)
-
-Common install paths add `opencode` to PATH. Verify:
-
-```bash
-opencode --version
-```
-
-### How OpenCode consumes this repo
-
-- **Project config**: `opencode.json` at the repo root sets defaults and `instructions` (skills + prompts).
-- **Non-interactive prompt**:
-
-```bash
-./scripts/opencode-run.sh "Summarize the agent architecture in 10 bullets"
-```
-
-- **Python isolation**: orchestration lives in `agent/`; OpenCode is optional for interactive work and `opencode run` automation. The adapter is `agent/opencode_adapter.py`.
-
 ## Safe mode vs execute mode
 
 | Mode | Behavior |
 |------|----------|
-| **Safe / dry-run** (default) | Executor **prints** proposed `write_file` and `run_command` actions without applying them. |
-| **Execute** | Pass **`--force-execute`** to `execute` or `loop` to write files and run commands. |
+| **Dry-run** | Executor reports `write_file` / `run_command` without applying |
+| **Execute** | Pass **`--force-execute`** to apply changes |
 
-Guardrails live in **`config/guardrails.json`** (blocked paths, size limits, command substring blocks). Writes to `.env`-like paths are rejected by default.
+Guardrails: **`config/guardrails.json`** (blocked paths, command substrings, size limits).
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+PYTHONPATH=. python3 -m pytest tests/ -q
+```
+
+`./scripts/bootstrap.sh` runs tests when `pytest` is installed.
 
 ## Task format
 
-See `tasks/template.task.json` and `tasks/example-feature.task.json`.
+See **`tasks/README.md`**. Key optional field: **`planner_prompt`** for alternate planner templates.
 
-- **`skill`**: filename in `skills/` without `.md`.
-- **`validation`**: list of shell commands run when you pass `--validate-after` (after `--force-execute`).
+## Memory
 
-## Memory / context
+- **`memory/conventions.md`**, **`memory/architecture.md`** — hand-edited
+- **`memory/repo-summary.md`** — starter file; regenerate with `./scripts/memory-update.sh`
 
-- Hand-edited: `memory/conventions.md`, `memory/architecture.md`
-- Generated: `memory/repo-summary.md` via `./scripts/memory-update.sh` or `python3 -m agent memory`
-- Planner outputs: `memory/plans/`
+## Logs
 
-## Adding a new skill
+- **`logs/agent-trace.log`** — append-only JSONL trace (path in `config/workspace.json` → `trace_log`)
 
-1. Create `skills/<id>.md` with behavior and constraints.
-2. Reference `"skill": "<id>"` in your task JSON.
-3. Optionally add the file to `opencode.json` → `instructions` (already includes `skills/**/*.md`).
+## Environment variables
 
-## Changing models (single config file)
+| Variable | Purpose |
+|----------|---------|
+| `OLLAMA_HOST` | Overrides `ollama_base_url` from `config/models.json` |
+| `OPENCODE_RUNTIME` | Set to `1` / `true` / `yes` to route LLM calls through OpenCode CLI |
+| `OPENCODE_CONFIG` | Optional path to OpenCode JSON config (OpenCode standard) |
 
-Edit **`config/models.json`**:
-
-- `models.planner`, `models.executor`, `models.reviewer`, `models.memory`
-- `options.*` for `temperature` and `num_ctx`
-
-For OpenCode interactive defaults, mirror changes in **`opencode.json`** (`model`, `small_model`).
-
-## Logs and trace
-
-- Append-only JSONL trace: `logs/agent-trace.log` (see `config/workspace.json` → `trace_log`)
-- File backups (when executing writes): `logs/backups/`
-
-## Multi-agent style workflows (optional)
-
-This repo implements **sequential** roles (planner → executor → reviewer). For parallel agents later:
-
-- Run **separate terminals** with different `config/models.json` entries.
-- Point each at the same repo; merge outputs in `memory/plans/` and PRs manually or with a small merge script.
-- OpenCode supports multiple agents via `.opencode/agents/` and `opencode run --agent` ([docs](https://open-code.ai/docs/en/config)).
+Copy **`.env.example`** to `.env` for local overrides (do not commit secrets).
 
 ## Repository layout
 
 ```
 .
-├── .cursor/rules/         # Cursor guidance (e.g. GitHub publish workflow)
-├── agent/                 # Python orchestrator
-├── config/                # models.json, workspace.json, guardrails.json
-├── prompts/               # planner / executor / reviewer / memory prompts
-├── skills/                # reusable skill markdown
-├── memory/                # persistent notes + generated summary + plans
-├── tasks/                 # task JSON definitions
-├── scripts/               # bootstrap, plan, execute, review, loop, memory-update
-├── examples/flows/        # illustrative outputs
-├── logs/                  # trace + backups (gitignored appropriately)
-├── opencode.json          # OpenCode project config
+├── .cursor/rules/
+├── .env.example
+├── agent/
+│   ├── cli.py
+│   ├── config_loader.py
+│   ├── env.py
+│   ├── guardrails.py
+│   ├── jsonutil.py
+│   ├── llm.py
+│   ├── ollama_client.py
+│   ├── opencode_adapter.py
+│   ├── repo_context.py
+│   ├── skills.py
+│   ├── trace.py
+│   └── flows/
+├── config/
+├── docs/
+│   └── INTEGRATION-OPENCODE.md
+├── examples/flows/
+├── memory/
+├── prompts/
+├── scripts/
+├── skills/
+├── tasks/
+├── tests/
+├── opencode.json
+├── pyproject.toml
+├── requirements-dev.txt
+├── requirements.txt
 └── README.md
 ```
 
 ## Troubleshooting
 
-- **`python3 -m agent doctor` fails**: start Ollama (`ollama serve`) and confirm `config/models.json` → `ollama_base_url`.
-- **Empty or bad JSON from models**: re-run with a stronger model or lower temperature in `config/models.json`.
-- **Git operations**: initialize a repo (`git init`) so `git ls-files` snapshots and reviewer diffs work better.
+- **`doctor` fails**: start `ollama serve`; check `OLLAMA_HOST` and firewall.
+- **Bad JSON from models**: `agent/jsonutil.py` tolerates fences and prose; lower temperature in `config/models.json` if needed.
+- **SSH to GitHub**: use port 443 if 22 is blocked (`ssh.github.com`).
 
 ## Publishing changes to GitHub
 
-Upstream repository: [noahwilliamshaffer/ClaudeCodeAgentClone](https://github.com/noahwilliamshaffer/ClaudeCodeAgentClone) (`main`).
-
-After you change the project, **commit with a clear message** and **push** so the remote stays current:
+Upstream: [noahwilliamshaffer/ClaudeCodeAgentClone](https://github.com/noahwilliamshaffer/ClaudeCodeAgentClone) (`main`).
 
 ```bash
-git status
 git add -A
-git commit -m "Short imperative summary of what changed
-
-Optional body: why, scope, or follow-ups."
+git commit -m "Describe the change clearly"
 git push origin main
 ```
 
-**Good commit messages** name the area and the change (examples: `Document Ollama model swap in config`, `Fix executor dry-run skipping validation`). **Avoid** empty or generic one-word messages unless you immediately amend with detail.
-
-Cursor / agent helpers in this repo follow `.cursor/rules/git-github.mdc` so automated edits aim to end with the same publish step when appropriate.
+See `.cursor/rules/git-github.mdc`.
 
 ## Future upgrades
 
-- Add **pytest** + golden tests for `jsonutil` and guardrails.
-- Wire **MCP tools** (OpenCode `opencode mcp`) for browser/docs without leaving the IDE.
-- Optional **Redis/SQLite** memory for cross-session retrieval.
-- **Structured patch** format (unified diff) instead of full-file writes for smaller deltas.
-- **Parallel workers** with a merge queue and explicit file ownership locks.
+- Unified-diff patches in the executor (smaller edits than full-file writes)
+- Optional SQLite memory for cross-session retrieval
+- MCP tools via OpenCode when you need external systems
 
 ---
 
-This scaffold is intentionally **modular**: swap **Ollama** models in one JSON file, keep **OpenCode** as an optional shell, and iterate from **Cursor** with a small set of scripts.
+This scaffold keeps **Ollama** as the default path, **OpenCode** behind an adapter, and everything runnable from **Cursor** with a small set of scripts.

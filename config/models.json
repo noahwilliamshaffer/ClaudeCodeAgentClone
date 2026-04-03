@@ -1,6 +1,7 @@
 {
-  "_comment": "Swap model IDs to match `ollama list`. Used by Python orchestrator (Ollama HTTP API).",
+  "_comment": "Swap model IDs to match `ollama list`. Orchestrator uses Ollama HTTP API unless OPENCODE_RUNTIME=1.",
   "ollama_base_url": "http://127.0.0.1:11434",
+  "ollama_host_env": "OLLAMA_HOST",
   "models": {
     "planner": "llama3.2:latest",
     "executor": "qwen2.5-coder:latest",

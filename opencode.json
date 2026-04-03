@@ -13,6 +13,7 @@
   "instructions": [
     "prompts/system.base.md",
     "memory/conventions.md",
+    "memory/repo-summary.md",
     "skills/**/*.md"
   ],
   "permission": {

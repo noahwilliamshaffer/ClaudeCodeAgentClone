@@ -32,7 +32,20 @@ def is_under_root(path: Path, root: Path) -> bool:
 
 
 def match_any_glob(rel_posix: str, patterns: list[str]) -> bool:
-    return any(fnmatch.fnmatch(rel_posix, p) for p in patterns)
+    """
+    Match repo-relative POSIX paths against glob patterns.
+
+    ``fnmatch`` does not treat ``**`` as recursive; patterns like ``**/.env`` are handled
+    explicitly so nested ``dir/.env`` paths match.
+    """
+    for p in patterns:
+        if fnmatch.fnmatch(rel_posix, p):
+            return True
+        if p.startswith("**/"):
+            suffix = p[3:]
+            if suffix and (rel_posix == suffix or rel_posix.endswith("/" + suffix)):
+                return True
+    return False
 
 
 def check_write_path(path: Path, root: Path, cfg: GuardrailsConfig) -> GuardResult:

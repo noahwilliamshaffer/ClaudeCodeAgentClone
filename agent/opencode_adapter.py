@@ -1,8 +1,24 @@
 """
-OpenCode CLI adapter — isolated layer so orchestration stays provider-agnostic.
+OpenCode CLI adapter — **isolated** from orchestration logic.
 
-Uses `opencode run` when OPENCODE_RUNTIME=1 or when --via-opencode is passed.
-Falls back to direct Ollama from ollama_client otherwise.
+Purpose
+-------
+The Python orchestrator normally talks to **Ollama** over HTTP (``ollama_client``). When you
+set ``OPENCODE_RUNTIME=1``, the same prompts are sent through ``opencode run`` so you can:
+
+- Use OpenCode’s configured providers/models from ``opencode.json``
+- Attach files with ``--file`` (see ``opencode_run``)
+- Later swap to ``opencode serve`` + HTTP without changing planner/executor code paths
+
+This module does **not** replicate OpenCode’s full agent tool loop; it only substitutes the
+**text generation** transport. See ``docs/INTEGRATION-OPENCODE.md`` for the full integration
+map and upgrade paths.
+
+Environment
+-----------
+- ``OPENCODE_RUNTIME``: when ``1``/``true``/``yes``, ``agent.llm.complete_chat`` routes here.
+- ``OPENCODE_CONFIG``: optional path to an alternate OpenCode JSON config (standard OpenCode).
+- Working directory for ``opencode run`` is always the workspace root so project ``opencode.json`` applies.
 """
 
 from __future__ import annotations
@@ -18,10 +34,20 @@ def opencode_available() -> bool:
     return shutil.which("opencode") is not None
 
 
+def should_use_opencode() -> bool:
+    return os.environ.get("OPENCODE_RUNTIME", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def build_opencode_env(workspace_root: Path, extra: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
-    # Project-local config merge: root opencode.json is discoverable by cwd.
     env.setdefault("OPENCODE_DISABLE_AUTOCOMPACT", "0")
+    # Ensure CWD-dependent discovery sees project config.
+    env["PWD"] = str(workspace_root)
     if extra:
         env.update(extra)
     return env
@@ -36,8 +62,9 @@ def opencode_run(
     format_json: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """
-    Run: opencode run -m ollama/MODEL ... --file f1 --file f2 "prompt"
-    Model should be like 'qwen2.5-coder:latest' (Ollama tag); we prefix ollama/.
+    Run: ``opencode run -m ollama/<model> [--file ...] "<prompt>"``
+
+    ``model`` may be ``qwen2.5-coder:latest`` or already ``ollama/qwen2.5-coder:latest``.
     """
     oc = shutil.which("opencode")
     if not oc:
@@ -64,5 +91,26 @@ def opencode_run(
     )
 
 
-def should_use_opencode() -> bool:
-    return os.environ.get("OPENCODE_RUNTIME", "").strip() in ("1", "true", "yes")
+def complete_with_opencode(
+    workspace_root: Path,
+    prompt: str,
+    *,
+    model: str,
+    temperature: float = 0.2,
+) -> str:
+    """
+    Single-shot completion via OpenCode CLI. Returns stdout text.
+
+    Note: OpenCode may not expose per-request temperature on the CLI; generation parameters
+    still follow ``opencode.json`` and provider defaults. The ``temperature`` argument is
+    reserved for future env-based wiring and for parity with the Ollama path.
+    """
+    _ = temperature  # reserved — OpenCode CLI uses project/provider defaults
+    proc = opencode_run(workspace_root, prompt, model=model)
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"opencode run failed (exit {proc.returncode}): {err}")
+    out = (proc.stdout or "").strip()
+    if not out:
+        raise RuntimeError("opencode returned empty stdout")
+    return out

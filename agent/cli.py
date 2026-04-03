@@ -13,6 +13,7 @@ from .config_loader import (
     load_paths,
     load_workspace,
 )
+from .env import resolve_ollama_base_url
 from .flows.executor import run_executor, run_task_validations
 from .flows.memory_flow import run_memory_update
 from .flows.planner import run_planner
@@ -180,18 +181,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     """Check Ollama reachability and list a few models."""
     root = _root()
     models = load_models(root)
-    from . import ollama_client
+    from . import llm
 
     try:
-        names = ollama_client.list_models(models.ollama_base_url)
+        names = llm.list_local_models(models)
     except Exception as e:
-        print(json.dumps({"ok": False, "error": str(e), "base_url": models.ollama_base_url}, indent=2))
+        print(
+            json.dumps(
+                {"ok": False, "error": str(e), "base_url": resolve_ollama_base_url(models)},
+                indent=2,
+            )
+        )
         return 1
+
     print(
         json.dumps(
             {
                 "ok": True,
-                "base_url": models.ollama_base_url,
+                "base_url": resolve_ollama_base_url(models),
                 "models": names[:50],
                 "model_count": len(names),
             },

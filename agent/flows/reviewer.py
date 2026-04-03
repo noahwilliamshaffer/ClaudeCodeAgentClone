@@ -9,7 +9,7 @@ from typing import Any
 
 from ..config_loader import AgentPaths, ModelsConfig
 from ..jsonutil import extract_json_object
-from ..ollama_client import chat
+from ..llm import complete_chat
 from ..trace import append_trace
 
 
@@ -51,27 +51,13 @@ def run_reviewer(
 ## Diff / change stats
 {diff}
 
-Respond with JSON in a ```json fence:
-{{
-  "verdict": "pass" | "needs_follow_up",
-  "regression_risks": ["..."],
-  "requirements_coverage": "short assessment",
-  "follow_up": [{{ "title": "", "rationale": "" }}]
-}}
+Follow the output format (JSON in a fenced block) defined in the reviewer template above.
 """
     messages = [
         {"role": "system", "content": "You are a senior reviewer. Output JSON only in a ```json fence."},
         {"role": "user", "content": user},
     ]
-    model = models.models["reviewer"]
-    opt = models.options.get("reviewer", {})
-    content = chat(
-        models.ollama_base_url,
-        model,
-        messages,
-        temperature=float(opt.get("temperature", 0.1)),
-        num_ctx=int(opt.get("num_ctx", 16384)) if opt.get("num_ctx") else None,
-    )
+    content = complete_chat(root, models, "reviewer", messages)
     parsed = extract_json_object(content)
     append_trace(trace_path, "review", {"verdict": parsed.get("verdict")})
     out_path = paths.logs_dir / "last-review.json"

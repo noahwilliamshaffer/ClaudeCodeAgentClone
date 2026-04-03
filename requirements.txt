@@ -1,6 +1,4 @@
-# Local agent workspace — Python 3.11+ recommended.
-# Core orchestration uses only the Python standard library.
-# No pip packages are required for the default flows.
-
-# Optional (uncomment if you add YAML task files or tooling):
-# pyyaml>=6.0
+# Runtime: Python 3.11+ standard library only (no pip packages required).
+#
+# Optional development tools:
+#   pip install -r requirements-dev.txt

@@ -32,7 +32,16 @@ echo "Python smoke test (import agent package):"
 PYTHONPATH="$ROOT" python3 -c "import agent; print('agent package OK:', agent.__version__)"
 
 echo ""
+if PYTHONPATH="$ROOT" python3 -c "import pytest" 2>/dev/null; then
+  echo "Running pytest (tests/):"
+  PYTHONPATH="$ROOT" python3 -m pytest "$ROOT/tests/" -q
+else
+  echo "pytest not installed; skip tests. Install with: pip install -r requirements-dev.txt"
+fi
+
+echo ""
 echo "Next:"
 echo "  1) ollama serve   # if not already running"
 echo "  2) ollama pull llama3.2 && ollama pull qwen2.5-coder"
 echo "  3) ./scripts/plan.sh --task tasks/example-feature.task.json"
+echo "  4) ./scripts/sample-secure-refactor-plan.sh   # security / refactor analysis sample"

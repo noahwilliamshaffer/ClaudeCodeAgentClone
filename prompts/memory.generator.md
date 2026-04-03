@@ -2,19 +2,25 @@
 
 Given a **list of file paths** (not full file contents), infer the repository structure.
 
-Return JSON in a ```json fence:
+Return JSON in a single markdown fenced block using exactly this shape:
 
 ```json
 {
-  "purpose": "one sentence",
+  "purpose": "One sentence describing what the repository is for.",
   "layout": [
-    { "name": "agent/", "description": "orchestration code" },
-    "skills/ — reusable behaviors"
+    { "name": "agent/", "description": "Python orchestration package" },
+    "scripts/ — shell entrypoints for Cursor terminal"
   ],
-  "conventions": ["bullet points about style or architecture if inferable from paths"],
-  "tech_stack": ["python", "bash", ...],
-  "agent_notes": "short guidance for future agents working in this repo"
+  "conventions": [
+    "Bullet points inferred from file names and directories",
+    "Use read-only analysis when the snapshot is thin"
+  ],
+  "tech_stack": [
+    "python",
+    "bash"
+  ],
+  "agent_notes": "Short guidance for future agents working in this repository."
 }
 ```
 
-If the repo is ambiguous, state assumptions explicitly in `agent_notes`.
+If the repository is ambiguous from paths alone, state assumptions explicitly in `agent_notes`.

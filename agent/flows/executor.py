@@ -12,7 +12,7 @@ from typing import Any
 from ..config_loader import AgentPaths, GuardrailsConfig, ModelsConfig, WorkspaceConfig
 from ..guardrails import check_command, check_file_size, check_write_path
 from ..jsonutil import extract_json_object
-from ..ollama_client import chat
+from ..llm import complete_chat
 from ..skills import load_skill
 from ..trace import append_trace
 
@@ -77,15 +77,7 @@ Rules:
         {"role": "user", "content": user},
     ]
 
-    model = models.models["executor"]
-    opt = models.options.get("executor", {})
-    content = chat(
-        models.ollama_base_url,
-        model,
-        messages,
-        temperature=float(opt.get("temperature", 0.15)),
-        num_ctx=int(opt.get("num_ctx", 32768)) if opt.get("num_ctx") else None,
-    )
+    content = complete_chat(root, models, "executor", messages)
 
     parsed = extract_json_object(content)
     actions = parsed.get("actions", [])

@@ -1,0 +1,11 @@
+{
+  "id": "secure-refactor-analysis-001",
+  "title": "Analyze repository and propose a secure refactor plan",
+  "description": "Analyze this repository using the provided file list snapshot. Identify security-relevant surfaces (subprocess, path handling, secrets, network, dependency risk). Propose a phased, low-risk refactor plan with concrete recommendations. Do not assume access to private data or runtime secrets. Output must follow the secure planner schema with security_findings and refactor_recommendations populated to the best of your ability from the snapshot alone.",
+  "skill": "secure-refactor-planning",
+  "planner_prompt": "planner.secure-refactor.md",
+  "validation": [
+    "python3 -m compileall -q agent",
+    "python3 -m pytest -q tests/"
+  ]
+}

@@ -23,3 +23,4 @@ OpenCode also reads instructions via `opencode.json` → `instructions` (see pro
 | `security-review` | Threat model + unsafe patterns |
 | `command-safety` | Shell hygiene, quoting, destructive-op avoidance |
 | `repo-onboarding` | Fast orientation for new contributors |
+| `secure-refactor-planning` | Security-aware analysis and incremental refactor plan |

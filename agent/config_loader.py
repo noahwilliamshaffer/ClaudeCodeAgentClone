@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,7 @@ class ModelsConfig:
     ollama_base_url: str
     models: dict[str, str]
     options: dict[str, dict[str, Any]]
+    ollama_host_env: str = "OLLAMA_HOST"
 
 
 @dataclass
@@ -87,6 +88,7 @@ def load_models(root: Path) -> ModelsConfig:
         ollama_base_url=d.get("ollama_base_url", "http://127.0.0.1:11434"),
         models=d["models"],
         options=d.get("options", {}),
+        ollama_host_env=str(d.get("ollama_host_env", "OLLAMA_HOST")),
     )
 
 
