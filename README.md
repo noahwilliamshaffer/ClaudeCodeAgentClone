@@ -72,6 +72,148 @@ The orchestrator implements a **stage graph** with **structured JSON state** per
 
 Implementation: `agent/loop/stages.py`, `agent/loop/runner.py`, `agent/loop/state.py`, `prompts/decide.next.md`.
 
+## Multi-Agent Architecture
+
+This system uses a **single orchestrator** (`runner.py`) that delegates work to **5 specialized LLM roles**. Each role uses a potentially different model optimized for its task.
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         PIPELINE RUNNER (runner.py)                      │
+│                    Orchestrates the entire workflow                      │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────┬───────────┬───┴───┬───────────┬───────────┐
+        ▼           ▼           ▼       ▼           ▼           ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │ PLANNER │ │EXECUTOR │ │REVIEWER │ │ MEMORY  │ │ DECIDE  │
+   │         │ │         │ │         │ │         │ │         │
+   │llama3.2 │ │qwen2.5- │ │qwen2.5- │ │llama3.2 │ │llama3.2 │
+   │         │ │ coder   │ │ coder   │ │         │ │         │
+   └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+```
+
+### The 5 Agent Roles
+
+| Role | Default Model | Purpose | Input | Output |
+|------|---------------|---------|-------|--------|
+| **Planner** | `llama3.2` | Creates structured multi-step plans | Task + repo snapshot + skill template | JSON plan with phases, steps, risks |
+| **Executor** | `qwen2.5-coder` | Generates code changes for one step | Plan step + repo context | File writes + shell commands |
+| **Reviewer** | `qwen2.5-coder` | Reviews changes against requirements | Task + plan + git diff | Verdict: `approved` / `needs_follow_up` |
+| **Memory** | `llama3.2` | Generates repo summaries | File list + conventions | Markdown summary for future context |
+| **Decide** | `llama3.2` | Decides next action in the loop | Execution result + review | `continue` / `complete` / `stop` |
+
+### How Task Delegation Works
+
+**1. The Runner Controls Flow** (`agent/loop/runner.py`)
+
+The orchestrator runs setup stages first, then loops through execution stages:
+
+```python
+# Setup stages (run once)
+for name in ("intake", "scan", "plan"):
+    run_one_stage(name, ctx, data, ...)
+
+# Execution loop (repeats until complete/stop)
+while rounds < max_rounds:
+    for name in ("execute", "validate", "review", "memory", "decide"):
+        run_one_stage(name, ctx, data, ...)
+    
+    if decision != "continue":
+        break  # Exit loop
+```
+
+**2. Each Stage Calls One LLM Role**
+
+Each flow module calls `complete_chat()` with a specific role name:
+
+```python
+# planner.py
+content = complete_chat(root, models, "planner", messages)
+
+# executor.py  
+content = complete_chat(root, models, "executor", messages)
+
+# reviewer.py
+content = complete_chat(root, models, "reviewer", messages)
+
+# decide.py
+content = complete_chat(root, models, "decide", messages)
+```
+
+**3. Model Selection via Config** (`config/models.json`)
+
+```json
+{
+  "models": {
+    "planner": "llama3.2:latest",
+    "executor": "qwen2.5-coder:latest",
+    "reviewer": "qwen2.5-coder:latest",
+    "memory": "llama3.2:latest",
+    "decide": "llama3.2:latest"
+  }
+}
+```
+
+### Data Flow Between Agents
+
+```
+TASK JSON {id, title, description, skill, validation}
+                        │
+                        ▼
+┌──────────────────────────────────────────────────────────────┐
+│  1. PLANNER                                                   │
+│  Input:  Task + Repo snapshot + Skill template               │
+│  Output: Plan {summary, phases, steps[], risks}              │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  2. EXECUTOR (runs per step)                                  │
+│  Input:  Plan step + Repo context                            │
+│  Output: Actions [{write_file, path, content},               │
+│                   {run_command, cmd}]                        │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  3. REVIEWER                                                  │
+│  Input:  Task + Plan summary + Git diff                      │
+│  Output: {verdict, regression_risks[], follow_up[]}          │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  4. DECIDE                                                    │
+│  Input:  Execution result + Review verdict + Step index      │
+│  Output: {decision: continue|complete|stop,                  │
+│           next_step_index, rationale}                        │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+               ┌───────────┴───────────┐
+               ▼                       ▼
+         [continue]               [complete/stop]
+               │                       │
+               ▼                       ▼
+         Back to EXECUTOR          END LOOP
+         (next step index)
+```
+
+### Key Design Patterns
+
+| Pattern | Description |
+|---------|-------------|
+| **Specialized Models** | Code tasks use `qwen2.5-coder`; planning/reasoning uses `llama3.2` |
+| **Structured JSON** | All agents output JSON in fenced blocks, parsed by `jsonutil.extract_json_object()` |
+| **Heuristic Fallbacks** | If LLM fails, `decide.py` uses rule-based logic to determine next action |
+| **Guardrails** | Executor checks all actions against safety rules before execution |
+| **Persistent State** | `PipelineStateData` saved to JSON after each stage for resumable runs |
+
+### Customizing Agent Behavior
+
+- **Change models**: Edit `config/models.json` to swap models for any role
+- **Modify prompts**: Edit files in `prompts/` (e.g., `planner.md`, `executor.md`, `reviewer.md`)
+- **Add skills**: Create new `.md` files in `skills/` and reference them in task JSON
+- **Adjust parameters**: Tune `temperature` and `num_ctx` per role in `config/models.json`
+
 ## Sample: analyze this repo and propose a secure refactor plan
 
 This runs the **planner only** (no executor writes). It uses `prompts/planner.secure-refactor.md` and `skills/secure-refactor-planning.md`.

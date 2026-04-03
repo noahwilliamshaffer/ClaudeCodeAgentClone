@@ -1,0 +1,36 @@
+{
+  "summary": "Implement a health check subcommand to verify Ollama's reachability",
+  "phases": [
+    {
+      "name": "Discover",
+      "mode": "read-only",
+      "description": "Inspect existing codebase and dependencies"
+    },
+    {
+      "name": "Implement",
+      "mode": "write",
+      "description": "Add health check subcommand with minimal dependencies"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Implement Health Check Subcommand",
+      "intent": "Verify Ollama's reachability at the configured base URL",
+      "mode": "write",
+      "risk": "low",
+      "validation": "optional `curl` command to verify reachability"
+    },
+    {
+      "title": "Document Usage in README",
+      "intent": "Provide instructions on how to use the new subcommand",
+      "mode": "read-only",
+      "risk": "low",
+      "validation": "empty string"
+    }
+  ],
+  "risks": [
+    "Potential issues with curl or other dependencies"
+  ],
+  "read_only_analysis": "No changes required for existing codebase",
+  "execution_notes": "Use `curl` to verify reachability and document usage in README"
+}

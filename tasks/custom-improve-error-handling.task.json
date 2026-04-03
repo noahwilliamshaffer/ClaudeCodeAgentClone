@@ -1,0 +1,9 @@
+{
+  "id": "improve-error-handling-001",
+  "title": "Improve error handling in the Ollama client",
+  "description": "Analyze the agent/ollama_client.py file and improve its error handling. Add better exception handling for network timeouts, connection refused errors, and invalid JSON responses. The improvements should help users understand what went wrong when Ollama is unreachable or returns unexpected data.",
+  "skill": "bug-fixing",
+  "validation": [
+    "python3 -m compileall -q agent"
+  ]
+}
