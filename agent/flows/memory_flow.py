@@ -20,8 +20,13 @@ def run_memory_update(
     ws: Any,
     *,
     trace_path: Path,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
-    """Generate or refresh memory/repo-summary.md from repo listing + model."""
+    """
+    Generate or refresh memory/repo-summary.md from repo listing + model.
+
+    If ``dry_run`` is True, compute ``meta`` and rendered body but do not write the file.
+    """
     scan = getattr(ws, "repo_scan", {}) or {}
     ignores = scan.get("ignore_globs", [])
     max_f = int(scan.get("max_files_listed", 400))
@@ -44,9 +49,18 @@ def run_memory_update(
 
     out = paths.memory_dir / "repo-summary.md"
     body = _render_repo_summary(meta)
+    if dry_run:
+        append_trace(trace_path, "memory_update", {"dry_run": True})
+        return {
+            "path": str(out),
+            "meta": meta,
+            "dry_run": True,
+            "body_preview": body[:8000],
+        }
+
     out.write_text(body, encoding="utf-8")
     append_trace(trace_path, "memory_update", {"path": str(out)})
-    return {"path": str(out), "meta": meta}
+    return {"path": str(out), "meta": meta, "dry_run": False}
 
 
 def _render_repo_summary(meta: dict[str, Any]) -> str:

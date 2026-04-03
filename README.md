@@ -32,6 +32,46 @@ python3 -m agent doctor
 ./scripts/plan.sh --task tasks/example-feature.task.json
 ```
 
+## Agent pipeline (explicit loop)
+
+The orchestrator implements a **stage graph** with **structured JSON state** persisted under `memory/runs/*.json`.
+
+| Stage | Purpose |
+|-------|---------|
+| **intake** | Load and validate task JSON |
+| **scan** | Repo file list + snapshot text for prompts |
+| **plan** | LLM planner → `plan` + `plan_paths` |
+| **select** | Choose active plan step index |
+| **execute** | Executor for that step (dry-run unless `--execute`; always dry in `--safe`) |
+| **validate** | Run `validation` commands from the task JSON |
+| **review** | Reviewer pass |
+| **memory** | Repo summary (`dry_run` when `--safe`) |
+| **decide** | Next-step decision: `continue` / `complete` / `stop` |
+
+**Full loop** (repeats execute→decide while decision is `continue`):
+
+```bash
+./scripts/pipeline.sh --task tasks/example-feature.task.json --safe
+```
+
+**Safe mode** (`--safe` or `AGENT_SAFE_MODE=1`): plans and reviews **without writing repo files** (executor dry-run, memory dry-run). Still runs LLM stages.
+
+**Execute with real writes** (not safe):
+
+```bash
+./scripts/pipeline.sh --task tasks/example-feature.task.json --execute
+```
+
+**One stage at a time** (resume from saved state):
+
+```bash
+./scripts/pipeline.sh --task tasks/example-feature.task.json --state memory/runs/my-run.json --stage intake
+./scripts/pipeline.sh --state memory/runs/my-run.json --stage scan
+# … plan → select → execute → validate → review → memory → decide
+```
+
+Implementation: `agent/loop/stages.py`, `agent/loop/runner.py`, `agent/loop/state.py`, `prompts/decide.next.md`.
+
 ## Sample: analyze this repo and propose a secure refactor plan
 
 This runs the **planner only** (no executor writes). It uses `prompts/planner.secure-refactor.md` and `skills/secure-refactor-planning.md`.
@@ -176,6 +216,11 @@ Copy **`.env.example`** to `.env` for local overrides (do not commit secrets).
 │   ├── repo_context.py
 │   ├── skills.py
 │   ├── trace.py
+│   ├── loop/
+│   │   ├── state.py
+│   │   ├── stages.py
+│   │   ├── runner.py
+│   │   └── decide.py
 │   └── flows/
 ├── config/
 ├── docs/

@@ -1,9 +1,10 @@
-"""CLI entrypoints: plan, execute, review, memory, loop."""
+"""CLI entrypoints: plan, execute, review, memory, loop, pipeline."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -208,6 +209,45 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pipeline(args: argparse.Namespace) -> int:
+    """
+    Explicit agent loop with structured state persisted to ``--state`` JSON.
+
+    * **Default:** full loop (intake → … → decide), repeating execute→decide while decision is ``continue``.
+    * **``--stage``:** run a single stage (for incremental runs).
+    * **``--safe``** or **``AGENT_SAFE_MODE=1``:** no file writes; executor is dry-run; memory update is dry-run.
+    """
+    from .loop.runner import run_pipeline
+
+    root = _root()
+    safe = bool(args.safe) or os.environ.get("AGENT_SAFE_MODE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    data, sp, ok = run_pipeline(
+        root,
+        state_path=args.state,
+        task_path=args.task,
+        safe_mode=safe,
+        execute_writes=bool(args.execute),
+        step_index=args.step,
+        max_rounds=int(args.max_rounds),
+        single_stage=args.stage,
+    )
+    summary = {
+        "ok": ok,
+        "state_path": str(sp),
+        "current_stage": data.current_stage,
+        "safe_mode": data.safe_mode,
+        "decision": data.decision,
+        "selected_step_index": data.selected_step_index,
+    }
+    print(json.dumps(summary, indent=2))
+    return 0 if ok else 1
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     root = _root()
     ws = load_workspace(root)
@@ -274,6 +314,46 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_doc = sub.add_parser("doctor", help="Check Ollama connectivity and list local models")
     p_doc.set_defaults(func=cmd_doctor)
+
+    p_pipe = sub.add_parser(
+        "pipeline",
+        help="Explicit loop: intake→scan→plan→select→execute→validate→review→memory→decide",
+    )
+    p_pipe.add_argument(
+        "--task",
+        help="Path to task JSON (required for a new run if state file does not exist)",
+    )
+    p_pipe.add_argument(
+        "--state",
+        help="Pipeline state JSON path (default path chosen from task id if omitted)",
+    )
+    p_pipe.add_argument(
+        "--stage",
+        help="Run only this stage (one-shot): intake, scan, plan, select, execute, validate, review, memory, decide",
+    )
+    p_pipe.add_argument(
+        "--safe",
+        action="store_true",
+        help="Safe mode: no repo file writes from executor; dry-run execution; memory dry-run; still runs plan/review",
+    )
+    p_pipe.add_argument(
+        "--execute",
+        action="store_true",
+        help="Allow executor to apply writes and run commands (ignored with --safe)",
+    )
+    p_pipe.add_argument(
+        "--step",
+        type=int,
+        default=None,
+        help="Initial plan step index for the first select stage",
+    )
+    p_pipe.add_argument(
+        "--max-rounds",
+        type=int,
+        default=50,
+        help="Max execute→decide cycles when the model keeps returning continue",
+    )
+    p_pipe.set_defaults(func=cmd_pipeline)
 
     return p
 

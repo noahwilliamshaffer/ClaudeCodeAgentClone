@@ -6,12 +6,14 @@
     "planner": "llama3.2:latest",
     "executor": "qwen2.5-coder:latest",
     "reviewer": "qwen2.5-coder:latest",
-    "memory": "llama3.2:latest"
+    "memory": "llama3.2:latest",
+    "decide": "llama3.2:latest"
   },
   "options": {
     "planner": { "temperature": 0.2, "num_ctx": 8192 },
     "executor": { "temperature": 0.15, "num_ctx": 32768 },
     "reviewer": { "temperature": 0.1, "num_ctx": 16384 },
-    "memory": { "temperature": 0.2, "num_ctx": 4096 }
+    "memory": { "temperature": 0.2, "num_ctx": 4096 },
+    "decide": { "temperature": 0.15, "num_ctx": 4096 }
   }
 }

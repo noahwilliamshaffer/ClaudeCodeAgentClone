@@ -46,6 +46,8 @@ def complete_chat(
     Uses OpenCode only when ``should_use_opencode()`` is true and the binary exists;
     otherwise calls Ollama directly.
     """
+    if role not in models.models:
+        raise KeyError(f"Unknown model role {role!r}; add it to config/models.json")
     model = models.models[role]
     opt = models.options.get(role, {})
     temperature = float(opt.get("temperature", 0.2))
