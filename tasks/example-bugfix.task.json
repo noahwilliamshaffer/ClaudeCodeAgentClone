@@ -1,0 +1,9 @@
+{
+  "id": "example-bugfix-001",
+  "title": "Harden JSON extraction when the model adds prose",
+  "description": "Improve `agent/jsonutil.py` to tolerate extra prose before/after JSON fences more reliably. Add a minimal unit-free self-check via `python3 -c` in validation if you add tests; otherwise use compileall.",
+  "skill": "bug-fixing",
+  "validation": [
+    "python3 -m compileall -q agent"
+  ]
+}

@@ -1,0 +1,83 @@
+"""Memory flow — repo summary and convention files."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from ..config_loader import AgentPaths, ModelsConfig
+from ..jsonutil import extract_json_object
+from ..ollama_client import chat
+from ..repo_context import list_repo_files, tree_summary
+from ..trace import append_trace
+
+
+def run_memory_update(
+    root: Path,
+    paths: AgentPaths,
+    models: ModelsConfig,
+    ws: Any,
+    *,
+    trace_path: Path,
+) -> dict[str, Any]:
+    """Generate or refresh memory/repo-summary.md from repo listing + model."""
+    scan = getattr(ws, "repo_scan", {}) or {}
+    ignores = scan.get("ignore_globs", [])
+    max_f = int(scan.get("max_files_listed", 400))
+    files = list_repo_files(root, ignores, max_f)
+    snap = tree_summary(files)
+
+    template = (paths.prompts_dir / "memory.generator.md").read_text(encoding="utf-8")
+    user = f"""
+{template}
+
+## File list
+{snap}
+"""
+    messages = [
+        {"role": "system", "content": "You produce JSON describing the repo. Use a ```json fence."},
+        {"role": "user", "content": user},
+    ]
+    model = models.models["memory"]
+    opt = models.options.get("memory", {})
+    content = chat(
+        models.ollama_base_url,
+        model,
+        messages,
+        temperature=float(opt.get("temperature", 0.2)),
+        num_ctx=int(opt.get("num_ctx", 4096)) if opt.get("num_ctx") else None,
+    )
+    meta = extract_json_object(content)
+
+    out = paths.memory_dir / "repo-summary.md"
+    body = _render_repo_summary(meta)
+    out.write_text(body, encoding="utf-8")
+    append_trace(trace_path, "memory_update", {"path": str(out)})
+    return {"path": str(out), "meta": meta}
+
+
+def _render_repo_summary(meta: dict[str, Any]) -> str:
+    lines = [
+        "# Repository summary (generated)",
+        "",
+        f"**Purpose:** {meta.get('purpose', '')}",
+        "",
+        "## Layout",
+        "",
+    ]
+    for item in meta.get("layout", []) or []:
+        if isinstance(item, str):
+            lines.append(f"- {item}")
+        elif isinstance(item, dict):
+            lines.append(f"- **{item.get('name')}**: {item.get('description', '')}")
+    lines.extend(["", "## Conventions", ""])
+    for c in meta.get("conventions", []) or []:
+        lines.append(f"- {c}")
+    lines.extend(["", "## Tech stack", ""])
+    for t in meta.get("tech_stack", []) or []:
+        lines.append(f"- {t}")
+    lines.extend(["", "## Notes for agents", ""])
+    lines.append(meta.get("agent_notes", "(none)"))
+    lines.extend(["", "---", "", "*Regenerate with `./scripts/memory-update.sh` or `python3 -m agent memory`*"])
+    return "\n".join(lines)

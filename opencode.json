@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "ollama/qwen2.5-coder:latest",
+  "small_model": "ollama/llama3.2:latest",
+  "autoupdate": false,
+  "provider": {
+    "ollama": {
+      "options": {
+        "baseURL": "http://127.0.0.1:11434"
+      }
+    }
+  },
+  "instructions": [
+    "prompts/system.base.md",
+    "memory/conventions.md",
+    "skills/**/*.md"
+  ],
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "write": "ask"
+  },
+  "watcher": {
+    "ignore": ["**/node_modules/**", "**/.git/**", "**/logs/**", "**/__pycache__/**"]
+  }
+}

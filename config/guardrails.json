@@ -1,0 +1,24 @@
+{
+  "deny_path_globs": [
+    "**/.env",
+    "**/.env.*",
+    "**/*credentials*",
+    "**/*.pem",
+    "**/id_rsa",
+    "**/id_ed25519",
+    "**/.ssh/**"
+  ],
+  "warn_path_globs": [
+    "**/config/secrets.*",
+    "**/*.key"
+  ],
+  "blocked_command_substrings": [
+    "rm -rf /",
+    "mkfs",
+    ":(){ :|:& };:",
+    "> /dev/sd"
+  ],
+  "require_execute_flag_for_destructive": true,
+  "max_file_bytes_write": 524288,
+  "max_files_per_step": 16
+}

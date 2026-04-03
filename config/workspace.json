@@ -1,0 +1,25 @@
+{
+  "workspace_name": "local-agent-workspace",
+  "default_task_path": "tasks/example-feature.task.json",
+  "plan_output_dir": "memory/plans",
+  "trace_log": "logs/agent-trace.log",
+  "repo_scan": {
+    "max_files_listed": 400,
+    "ignore_globs": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/.venv/**",
+      "**/venv/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/logs/**",
+      "**/.agent-backups/**"
+    ]
+  },
+  "execution": {
+    "default_dry_run": true,
+    "backup_on_write": true,
+    "backup_dir": "logs/backups"
+  }
+}

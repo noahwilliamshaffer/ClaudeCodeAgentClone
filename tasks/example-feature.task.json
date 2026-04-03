@@ -1,0 +1,9 @@
+{
+  "id": "example-feature-001",
+  "title": "Add a small CLI healthcheck subcommand",
+  "description": "Add a `health` subcommand (or equivalent) that verifies Ollama is reachable at the configured base URL and prints a short JSON status. Keep dependencies at zero beyond the stdlib. Document usage in README if needed.",
+  "skill": "feature-implementation",
+  "validation": [
+    "python3 -m compileall -q agent"
+  ]
+}

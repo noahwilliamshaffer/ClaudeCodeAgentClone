@@ -1,0 +1,7 @@
+{
+  "id": "my-task-001",
+  "title": "Short title",
+  "description": "What to achieve, acceptance criteria, and constraints.",
+  "skill": "feature-implementation",
+  "validation": []
+}

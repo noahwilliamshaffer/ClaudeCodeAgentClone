@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Agent workspace
+logs/*.log
+logs/backups/
+!logs/.gitkeep
+memory/plans/*.md
+!memory/plans/.gitkeep
+*.swp
+*~
+
+# Local secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
