@@ -1,0 +1,15 @@
+---
+description: Publish repo changes to GitHub with clear commit messages
+alwaysApply: true
+---
+
+# GitHub workflow for this repository
+
+- **Remote:** `git@github.com:noahwilliamshaffer/ClaudeCodeAgentClone.git` (default branch: `main`).
+- After making meaningful edits, **commit and push** so GitHub stays in sync—do not leave completed work only on disk.
+- **Commit messages** must be descriptive:
+  - First line: imperative, ~72 chars or less (e.g. `Add health check to agent doctor command`).
+  - Optionally a blank line and bullet details (what/why, not internal narration).
+  - Avoid vague messages like `fix`, `updates`, or `wip` unless paired with specifics.
+- Before pushing: `git status`, ensure secrets and local-only files are not staged (respect `.gitignore`).
+- If SSH to GitHub fails on port 22, this machine may use `ssh.github.com` on port 443 (see `~/.ssh/config`).

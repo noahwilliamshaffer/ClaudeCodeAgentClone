@@ -186,6 +186,7 @@ This repo implements **sequential** roles (planner → executor → reviewer). F
 
 ```
 .
+├── .cursor/rules/         # Cursor guidance (e.g. GitHub publish workflow)
 ├── agent/                 # Python orchestrator
 ├── config/                # models.json, workspace.json, guardrails.json
 ├── prompts/               # planner / executor / reviewer / memory prompts
@@ -204,6 +205,25 @@ This repo implements **sequential** roles (planner → executor → reviewer). F
 - **`python3 -m agent doctor` fails**: start Ollama (`ollama serve`) and confirm `config/models.json` → `ollama_base_url`.
 - **Empty or bad JSON from models**: re-run with a stronger model or lower temperature in `config/models.json`.
 - **Git operations**: initialize a repo (`git init`) so `git ls-files` snapshots and reviewer diffs work better.
+
+## Publishing changes to GitHub
+
+Upstream repository: [noahwilliamshaffer/ClaudeCodeAgentClone](https://github.com/noahwilliamshaffer/ClaudeCodeAgentClone) (`main`).
+
+After you change the project, **commit with a clear message** and **push** so the remote stays current:
+
+```bash
+git status
+git add -A
+git commit -m "Short imperative summary of what changed
+
+Optional body: why, scope, or follow-ups."
+git push origin main
+```
+
+**Good commit messages** name the area and the change (examples: `Document Ollama model swap in config`, `Fix executor dry-run skipping validation`). **Avoid** empty or generic one-word messages unless you immediately amend with detail.
+
+Cursor / agent helpers in this repo follow `.cursor/rules/git-github.mdc` so automated edits aim to end with the same publish step when appropriate.
 
 ## Future upgrades
 
